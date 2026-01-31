@@ -75,6 +75,12 @@ Examples:
         help="Context hint for the judge (e.g., 'architecture decision', 'ethics question')",
     )
     parser.add_argument(
+        "--format", "-f",
+        choices=["json", "yaml", "prose"],
+        default="prose",
+        help="Output format: json (machine-parseable), yaml (structured), prose (default)",
+    )
+    parser.add_argument(
         "--share",
         action="store_true",
         help="Upload transcript to secret GitHub Gist and print URL",
@@ -183,6 +189,7 @@ Examples:
             social_mode=social_mode,
             persona=args.persona,
             advocate_idx=advocate_idx,
+            format=args.format,
         )
 
         # Print failure summary

@@ -4,6 +4,9 @@ import asyncio
 import httpx
 import json
 import re
+import time
+import yaml
+from datetime import datetime
 from pathlib import Path
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -541,6 +544,55 @@ def detect_consensus(conversation: list[tuple[str, str]], council_size: int) -> 
     return False, "no consensus"
 
 
+def extract_structured_summary(
+    judge_response: str,
+    question: str,
+    models_used: list[str],
+    rounds: int,
+    duration: float,
+    cost: float,
+) -> dict:
+    lines = judge_response.split('\n')
+    
+    decision = ""
+    confidence = "medium"
+    reasoning = ""
+    dissents = []
+    action_items = []
+    
+    for i, line in enumerate(lines):
+        line_lower = line.lower()
+        if 'recommend' in line_lower or 'decision:' in line_lower:
+            decision = line.strip()
+        elif 'dissent' in line_lower or 'disagree' in line_lower:
+            dissents.append({"model": "Unknown", "concern": line.strip()})
+        elif 'action' in line_lower or 'next step' in line_lower:
+            action_items.append({"action": line.strip(), "priority": "medium"})
+    
+    if not decision:
+        for line in lines:
+            if len(line.strip()) > 20:
+                decision = line.strip()
+                break
+    
+    return {
+        "schema_version": "1.0",
+        "question": question,
+        "decision": decision[:500] if decision else "See transcript for details",
+        "confidence": confidence,
+        "reasoning_summary": judge_response[:1000],
+        "dissents": dissents[:5],
+        "action_items": action_items[:5],
+        "meta": {
+            "timestamp": datetime.now().isoformat(),
+            "models_used": models_used,
+            "rounds": rounds,
+            "duration_seconds": duration,
+            "estimated_cost_usd": cost
+        }
+    }
+
+
 def run_council(
     question: str,
     council_config: list[tuple[str, str, tuple[str, str] | None]],
@@ -555,9 +607,11 @@ def run_council(
     social_mode: bool = False,
     persona: str | None = None,
     advocate_idx: int | None = None,
+    format: str = "prose",
 ) -> tuple[str, list[str]]:
     """Run the council deliberation. Returns (transcript, failed_models)."""
 
+    start_time = time.time()
     council_names = [name for name, _, _ in council_config]
     blind_claims = []
     failed_models = []
@@ -589,6 +643,7 @@ def run_council(
 
     conversation = []
     output_parts = []
+    current_round = 0
 
     if blind_claims:
         for name, model_name, claims in blind_claims:
@@ -653,6 +708,7 @@ Be direct. Challenge weak arguments. Don't be sycophantic.
 Prioritize PRACTICAL, ACTIONABLE advice over academic observations. Avoid jargon."""
 
     for round_num in range(rounds):
+        current_round = round_num + 1
         round_speakers = []
         for idx, (name, model, fallback) in enumerate(council_config):
             dname = display_names[name]
@@ -814,6 +870,21 @@ Don't recommend building infrastructure for problems that don't exist yet."""
         print()
 
     output_parts.append(f"### Judge ({judge_model_name})\n{judge_response}")
+
+    if format != 'prose':
+        structured = extract_structured_summary(
+            judge_response=judge_response,
+            question=question,
+            models_used=[name for name, _, _ in council_config],
+            rounds=current_round if rounds > 0 else 1,
+            duration=time.time() - start_time,
+            cost=0.85,
+        )
+        
+        if format == 'json':
+            output_parts.append('\n\n---\n\n' + json.dumps(structured, indent=2, ensure_ascii=False))
+        else:
+            output_parts.append('\n\n---\n\n' + yaml.dump(structured, allow_unicode=True, default_flow_style=False))
 
     if anonymous:
         final_output = "\n\n".join(output_parts)
