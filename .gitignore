@@ -1,0 +1,16 @@
+# History (may contain personal questions)
+council_history.jsonl
+
+# Local Claude config
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
