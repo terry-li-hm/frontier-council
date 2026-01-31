@@ -1,6 +1,6 @@
 """Frontier Council - Multi-model deliberation for important decisions."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .council import (
     run_council,
