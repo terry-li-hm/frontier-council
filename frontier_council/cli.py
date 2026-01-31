@@ -44,7 +44,7 @@ Examples:
   frontier-council "Architecture choice" --rounds 3 --output transcript.md
         """,
     )
-    parser.add_argument("question", help="The question for the council to deliberate")
+    parser.add_argument("question", nargs="?", help="The question for the council to deliberate")
     parser.add_argument(
         "--rounds",
         type=int,
@@ -120,6 +120,10 @@ Examples:
             if len(sessions) > 20:
                 print(f"\n  ... and {len(sessions) - 20} more")
         sys.exit(0)
+
+    # Require question for normal operation
+    if not args.question:
+        parser.error("the following arguments are required: question")
 
     # Auto-detect social context if not explicitly set
     social_mode = args.social or detect_social_context(args.question)
