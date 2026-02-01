@@ -26,6 +26,15 @@ COUNCIL = [
 
 JUDGE_MODEL = "anthropic/claude-opus-4.5"
 
+# Domain-specific regulatory contexts
+DOMAIN_CONTEXTS = {
+    "banking": "You are operating in a banking/financial services regulatory environment. Consider: HKMA/MAS/FCA requirements, Model Risk Management (MRM) expectations, audit trail needs, BCBS 239 governance, explainability requirements, documentation standards, and regulatory scrutiny levels.",
+    "healthcare": "You are operating in a healthcare regulatory environment. Consider: HIPAA constraints on PHI handling, FDA requirements for medical devices, clinical validation expectations, interoperability standards (FHIR), GxP compliance, and patient safety requirements.",
+    "eu": "You are operating in the EU regulatory environment. Consider: GDPR data protection requirements, EU AI Act risk categorization, Digital Markets Act compliance, cross-border data transfer rules (Schrems II), and EU data localization expectations.",
+    "fintech": "You are operating in a fintech regulatory environment. Consider: KYC/AML requirements, PSD2 banking regulations, e-money licensing expectations, payment services directive compliance, and financial consumer protection rules.",
+    "bio": "You are operating in a biotech/pharma regulatory environment. Consider: FDA/EMA drug approval processes, GMP manufacturing requirements, clinical trial design expectations, pharmacovigilance obligations, and post-market surveillance requirements.",
+}
+
 # Keywords that suggest social/conversational context (auto-detect)
 SOCIAL_KEYWORDS = [
     "interview", "ask him", "ask her", "ask them", "question to ask",
@@ -443,6 +452,7 @@ async def run_blind_phase_parallel(
     moonshot_api_key: str | None = None,
     verbose: bool = True,
     persona: str | None = None,
+    domain_context: str = "",
 ) -> list[tuple[str, str, str]]:
     """Parallel blind first-pass: all models stake claims simultaneously."""
     blind_system = """You are participating in the BLIND PHASE of a council deliberation.
@@ -456,6 +466,13 @@ Provide a CLAIM SKETCH (not a full response):
 3. Key assumption or uncertainty
 
 Keep it concise (~100 words). The full deliberation comes later."""
+
+    if domain_context:
+        blind_system += f"""
+
+DOMAIN CONTEXT: {domain_context}
+
+Apply this regulatory domain context to your analysis."""
 
     if persona:
         blind_system += f"""
@@ -607,18 +624,22 @@ def run_council(
     social_mode: bool = False,
     persona: str | None = None,
     advocate_idx: int | None = None,
+    domain: str | None = None,
+    challenger_idx: int | None = None,
     format: str = "prose",
 ) -> tuple[str, list[str]]:
     """Run the council deliberation. Returns (transcript, failed_models)."""
 
     start_time = time.time()
+    
+    domain_context = DOMAIN_CONTEXTS.get(domain, "") if domain else ""
     council_names = [name for name, _, _ in council_config]
     blind_claims = []
     failed_models = []
 
     if blind:
         blind_claims = asyncio.run(run_blind_phase_parallel(
-            question, council_config, api_key, google_api_key, moonshot_api_key, verbose, persona
+            question, council_config, api_key, google_api_key, moonshot_api_key, verbose, persona, domain_context
         ))
         for name, model_name, claims in blind_claims:
             if claims.startswith("["):
@@ -634,6 +655,8 @@ def run_council(
         if anonymous:
             print("(Models see each other as Speaker 1, 2, etc. to prevent bias)")
         print(f"Rounds: {rounds}")
+        if domain:
+            print(f"Domain context: {domain}")
         print(f"Question: {question[:100]}{'...' if len(question) > 100 else ''}")
         print()
         print("=" * 60)
@@ -707,6 +730,19 @@ Previous speakers this round: {previous_speakers}
 Be direct. Challenge weak arguments. Don't be sycophantic.
 Prioritize PRACTICAL, ACTIONABLE advice over academic observations. Avoid jargon."""
 
+    challenger_addition = """
+
+SPECIAL ROLE: You are the CHALLENGER. Your job is to argue the CONTRARIAN position.
+
+REQUIREMENTS:
+1. You MUST explicitly DISAGREE with at least one major point from the other speakers
+2. Identify the weakest assumption in the emerging consensus and attack it
+3. Consider: What would make this advice WRONG? What's the contrarian take?
+4. If everyone is converging too fast, that's a red flag — find the hidden complexity
+
+Don't just "add nuance" or "build on" — find something to genuinely challenge.
+If you can't find real disagreement, say why the consensus might be groupthink."""
+
     for round_num in range(rounds):
         current_round = round_num + 1
         round_speakers = []
@@ -729,6 +765,13 @@ Prioritize PRACTICAL, ACTIONABLE advice over academic observations. Avoid jargon
                     previous_speakers=previous
                 )
 
+            if domain_context:
+                system_prompt += f"""
+
+DOMAIN CONTEXT: {domain_context}
+
+Apply this regulatory domain context to your analysis."""
+
             if social_mode:
                 system_prompt += social_constraint
 
@@ -742,6 +785,9 @@ Factor this into your advice — don't just give strategically optimal answers, 
 
             if idx == advocate_idx and round_num == 0:
                 system_prompt += devils_advocate_addition
+            
+            if idx == challenger_idx and round_num == 0:
+                system_prompt += challenger_addition
 
             user_content = f"Question for the council:\n\n{question}"
             if blind_context:
@@ -811,6 +857,10 @@ Factor this into your advice — don't just give strategically optimal answers, 
     context_hint = ""
     if context:
         context_hint = f"\n\nContext about this question: {context}\nConsider this context when weighing perspectives and forming recommendations."
+    
+    domain_hint = ""
+    if domain_context:
+        domain_hint = f"\n\nDOMAIN CONTEXT: {domain}\nConsider this regulatory domain context when weighing perspectives and forming recommendations."
 
     social_judge_section = ""
     if social_mode:
@@ -819,7 +869,7 @@ Factor this into your advice — don't just give strategically optimal answers, 
 ## Social Calibration Check
 [Would the recommendation feel natural in conversation? Is it something you'd actually say, or does it sound like strategic over-optimization? If the council produced something too formal/structured, suggest a simpler, more human alternative.]"""
 
-    judge_system = f"""You are the Judge, responsible for synthesizing the council's deliberation.{context_hint}
+    judge_system = f"""You are the Judge, responsible for synthesizing the council's deliberation.{context_hint}{domain_hint}
 
 After the council members have shared their perspectives, you:
 1. Identify points of AGREEMENT across all members

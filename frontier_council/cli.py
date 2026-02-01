@@ -29,6 +29,7 @@ from .council import (
     COUNCIL,
     detect_social_context,
     run_council,
+    DOMAIN_CONTEXTS,
 )
 
 
@@ -101,6 +102,14 @@ Examples:
         help="Which speaker (1-5) should be devil's advocate (default: random)",
     )
     parser.add_argument(
+        "--domain",
+        help="Regulatory domain context (banking, healthcare, eu, fintech, bio)",
+    )
+    parser.add_argument(
+        "--challenger",
+        help="Which model should argue contrarian (claude, gpt, gemini, grok, kimi). Default: grok",
+    )
+    parser.add_argument(
         "--no-save",
         action="store_true",
         help="Don't auto-save transcript to ~/.frontier-council/sessions/",
@@ -136,6 +145,27 @@ Examples:
     if social_mode and not args.social and not args.quiet:
         print("(Auto-detected social context - enabling social calibration mode)")
         print()
+
+    # Validate and resolve domain
+    domain_context = None
+    if args.domain:
+        if args.domain.lower() not in DOMAIN_CONTEXTS:
+            print(f"Error: Unknown domain '{args.domain}'. Valid domains: {', '.join(DOMAIN_CONTEXTS.keys())}", file=sys.stderr)
+            sys.exit(1)
+        domain_context = args.domain.lower()
+
+    # Resolve challenger model
+    challenger_idx = None
+    if args.challenger:
+        challenger_lower = args.challenger.lower()
+        model_name_map = {n.lower(): i for i, (n, _, _) in enumerate(COUNCIL)}
+        if challenger_lower not in model_name_map:
+            print(f"Error: Unknown model '{args.challenger}'. Valid models: {', '.join(n for n, _, _ in COUNCIL)}", file=sys.stderr)
+            sys.exit(1)
+        challenger_idx = model_name_map[challenger_lower]
+    elif "domain" in DOMAIN_CONTEXTS or args.domain:
+        # Default challenger: Grok if domain is set (Grok naturally tends contrarian)
+        challenger_idx = 3  # Grok index in COUNCIL
 
     # Get API keys
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -189,6 +219,8 @@ Examples:
             social_mode=social_mode,
             persona=args.persona,
             advocate_idx=advocate_idx,
+            domain=domain_context,
+            challenger_idx=challenger_idx,
             format=args.format,
         )
 
