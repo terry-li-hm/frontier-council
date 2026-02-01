@@ -610,6 +610,96 @@ def extract_structured_summary(
     }
 
 
+def run_followup_discussion(
+    question: str,
+    topic: str,
+    council_config: list[tuple[str, str, tuple[str, str] | None]],
+    api_key: str,
+    domain_context: str = "",
+    social_mode: bool = False,
+    persona: str | None = None,
+    verbose: bool = True,
+) -> str:
+    """Run a focused followup discussion on a specific topic with 2 models. Returns the followup transcript."""
+    # Use judge (Claude 0) and one other model (GPT 1) for followup
+    followup_models = council_config[:2]  # Claude and GPT
+    
+    followup_transcript_parts = []
+    
+    if verbose:
+        print()
+        print("=" * 60)
+        print(f"FOLLOWUP: {topic}")
+        print("=" * 60)
+        print()
+    
+    social_constraint = """
+
+SOCIAL CALIBRATION: This is a social/conversational context (interview, networking, outreach).
+Your output should feel natural in conversation - something you'd actually say over coffee.
+Avoid structured, multi-part diagnostic questions that sound like interrogation.
+Simple and human beats strategic and comprehensive. Optimize for being relatable, not thorough.""" if social_mode else ""
+    
+    followup_parts = [
+        "You are participating in a FOCUSED FOLLOWUP discussion on a specific topic.",
+        "",
+        f"The main council has concluded, and we're now drilling down into:",
+        f"TOPIC: {topic}",
+        "",
+        "Keep your response focused on this specific topic. Don't rehash the full council deliberation.",
+        "Be concise and practical.",
+        "",
+    ]
+    
+    if social_constraint:
+        followup_parts.append(social_constraint.strip())
+    
+    if persona:
+        followup_parts.extend([
+            "",
+            "IMPORTANT CONTEXT about the person asking:",
+            persona,
+            "",
+            "Factor this into your advice — don't just give strategically optimal answers, consider what fits THIS person.",
+        ])
+    
+    if domain_context:
+        followup_parts.extend([
+            "",
+            f"DOMAIN CONTEXT: {domain_context}",
+            "",
+            "Apply this regulatory domain context to your analysis.",
+        ])
+    
+    followup_system = "\n".join(followup_parts)
+    
+    followup_transcript_parts.append(f"### Followup Discussion: {topic}\n")
+    
+    for i, (name, model, fallback) in enumerate(followup_models):
+        messages = [
+            {"role": "system", "content": followup_system},
+            {"role": "user", "content": f"Original Question:\n\n{question}\n\nFocus your response on: {topic}"},
+        ]
+        
+        if verbose:
+            print(f"### {name}")
+        
+        response = query_model(api_key, model, messages, stream=verbose)
+        
+        if verbose:
+            print()
+        
+        followup_transcript_parts.append(f"### {name}\n{response}\n")
+    
+    if verbose:
+        print("=" * 60)
+        print("FOLLOWUP COMPLETE")
+        print("=" * 60)
+        print()
+    
+    return "\n\n".join(followup_transcript_parts)
+
+
 def run_council(
     question: str,
     council_config: list[tuple[str, str, tuple[str, str] | None]],

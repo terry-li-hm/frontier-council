@@ -30,6 +30,7 @@ from .council import (
     detect_social_context,
     run_council,
     DOMAIN_CONTEXTS,
+    run_followup_discussion,
 )
 
 
@@ -43,6 +44,7 @@ Examples:
   frontier-council "What questions should I ask?" --social
   frontier-council "Career decision" --persona "builder who hates process work"
   frontier-council "Architecture choice" --rounds 3 --output transcript.md
+  frontier-council "Decision" --domain banking --followup --output counsel.md
         """,
     )
     parser.add_argument("question", nargs="?", help="The question for the council to deliberate")
@@ -108,6 +110,11 @@ Examples:
     parser.add_argument(
         "--challenger",
         help="Which model should argue contrarian (claude, gpt, gemini, grok, kimi). Default: grok",
+    )
+    parser.add_argument(
+        "--followup",
+        action="store_true",
+        help="Enable followup mode to drill into specific points after judge synthesis",
     )
     parser.add_argument(
         "--no-save",
@@ -228,6 +235,27 @@ Examples:
             challenger_idx=challenger_idx,
             format=args.format,
         )
+
+        # Followup mode
+        followup_transcript = ""
+        if args.followup and not args.quiet:
+            print("\n" + "=" * 60)
+            print("Enter topic to explore further (or 'done'): ", end="", flush=True)
+            topic = input().strip()
+            
+            if topic and topic.lower() != "done":
+                domain_ctxt = DOMAIN_CONTEXTS.get(domain_context, "") if domain_context else ""
+                followup_transcript = run_followup_discussion(
+                    question=args.question,
+                    topic=topic,
+                    council_config=COUNCIL,
+                    api_key=api_key,
+                    domain_context=domain_ctxt,
+                    social_mode=social_mode,
+                    persona=args.persona,
+                    verbose=not args.quiet,
+                )
+                transcript += "\n\n" + followup_transcript
 
         # Print failure summary
         if failed_models and not args.quiet:
