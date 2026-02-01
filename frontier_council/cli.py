@@ -109,7 +109,7 @@ Examples:
     )
     parser.add_argument(
         "--challenger",
-        help="Which model should argue contrarian (claude, gpt, gemini, grok, kimi). Default: grok",
+        help="Which model should argue contrarian (claude, gpt, gemini, grok, kimi). Default: claude",
     )
     parser.add_argument(
         "--followup",
@@ -171,8 +171,10 @@ Examples:
             sys.exit(1)
         challenger_idx = model_name_map[challenger_lower]
     elif args.domain:
-        # Default challenger: Grok (index 3) when domain is set - Grok naturally tends contrarian
-        challenger_idx = 3
+        # Default challenger: Claude (index 0) when domain is set
+        # Reasoning: Grok is naturally contrarian anyway, so assigning Claude as challenger
+        # gives you Claude's depth + explicit contrarian framing, plus Grok's natural skepticism
+        challenger_idx = 0
 
     if not args.quiet and challenger_idx is not None:
         challenger_name = COUNCIL[challenger_idx][0]
