@@ -43,9 +43,12 @@ SOCIAL_KEYWORDS = [
     "what should i say", "how should i respond", "conversation",
 ]
 
-# Thinking models don't stream well - use non-streaming for these
+# Thinking models - use non-streaming, higher tokens, longer timeout
 THINKING_MODEL_SUFFIXES = {
+    "claude-opus-4.5",
+    "gpt-5.2-pro",
     "gemini-3-pro-preview",
+    "grok-4",
     "kimi-k2.5",
     "deepseek-r1",
     "o1-preview", "o1-mini", "o1",
