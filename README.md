@@ -1,17 +1,18 @@
 # Frontier Council
 
-Multi-model deliberation for important decisions. 5 frontier LLMs debate a question, then a judge synthesizes consensus.
+Multi-model deliberation for important decisions. 4 frontier LLMs debate a question, then Claude judges and synthesizes.
 
 Inspired by [Andrej Karpathy's LLM Council](https://github.com/karpathy/llm-council), with added blind phase (anti-anchoring), explicit engagement requirements, rotating challenger role, and social calibration mode.
 
 ## Models
 
-- Claude (claude-opus-4.5)
+**Council (deliberators):**
 - GPT (gpt-5.2-pro)
 - Gemini (gemini-3-pro-preview)
 - Grok (grok-4)
 - Kimi (kimi-k2.5)
-- Judge: Claude Opus 4.5
+
+**Judge:** Claude Opus 4.5 (synthesizes + adds own perspective)
 
 ## Installation
 
@@ -76,7 +77,7 @@ All sessions are auto-saved to `~/.frontier-council/sessions/` for later review.
 | `--share` | Upload transcript to secret GitHub Gist |
 | `--social` | Enable social calibration mode (auto-detected for interview/networking) |
 | `--persona TEXT` | Context about the person asking |
-| `--challenger MODEL` | Which model starts as challenger (claude/gpt/gemini/grok/kimi). Rotates each round. |
+| `--challenger MODEL` | Which model starts as challenger (gpt/gemini/grok/kimi). Rotates each round. |
 | `--domain DOMAIN` | Regulatory domain context (banking, healthcare, eu, fintech, bio) |
 | `--followup` | Enable interactive drill-down after judge synthesis |
 | `--quiet` | Suppress progress output |
@@ -99,7 +100,7 @@ All sessions are auto-saved to `~/.frontier-council/sessions/` for later review.
 **Rotating Challenger:**
 - One model each round is assigned the "challenger" role
 - The challenger MUST argue the contrarian position and identify weaknesses in emerging consensus
-- Role rotates each round (Claude R1 → GPT R2 → Gemini R3...) to ensure sustained disagreement
+- Role rotates each round (GPT R1 → Gemini R2 → Grok R3 → Kimi R4...) to ensure sustained disagreement
 - Challenger is excluded from consensus detection (forced disagreement shouldn't block early exit)
 
 **Anonymous Deliberation:**
