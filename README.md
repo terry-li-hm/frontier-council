@@ -2,7 +2,7 @@
 
 Multi-model deliberation for important decisions. 5 frontier LLMs debate a question, then a judge synthesizes consensus.
 
-Inspired by [Andrej Karpathy's LLM Council](https://github.com/karpathy/llm-council), with added blind phase (anti-anchoring), explicit engagement requirements, devil's advocate role, and social calibration mode.
+Inspired by [Andrej Karpathy's LLM Council](https://github.com/karpathy/llm-council), with added blind phase (anti-anchoring), explicit engagement requirements, rotating challenger role, and social calibration mode.
 
 ## Models
 
@@ -76,7 +76,9 @@ All sessions are auto-saved to `~/.frontier-council/sessions/` for later review.
 | `--share` | Upload transcript to secret GitHub Gist |
 | `--social` | Enable social calibration mode (auto-detected for interview/networking) |
 | `--persona TEXT` | Context about the person asking |
-| `--advocate N` | Which speaker (1-5) should be devil's advocate (default: random) |
+| `--challenger MODEL` | Which model starts as challenger (claude/gpt/gemini/grok/kimi). Rotates each round. |
+| `--domain DOMAIN` | Regulatory domain context (banking, healthcare, eu, fintech, bio) |
+| `--followup` | Enable interactive drill-down after judge synthesis |
 | `--quiet` | Suppress progress output |
 | `--sessions` | List recent saved sessions |
 | `--no-save` | Don't auto-save transcript to ~/.frontier-council/sessions/ |
@@ -91,8 +93,14 @@ All sessions are auto-saved to `~/.frontier-council/sessions/` for later review.
 **Deliberation Protocol:**
 1. All models see everyone's blind claims, then deliberate
 2. Each model MUST explicitly AGREE, DISAGREE, or BUILD ON previous speakers by name
-3. After each round, the system checks for consensus (4/5 agreement triggers early exit)
+3. After each round, the system checks for consensus (3/4 non-challengers agreeing triggers early exit)
 4. Judge synthesizes the full deliberation
+
+**Rotating Challenger:**
+- One model each round is assigned the "challenger" role
+- The challenger MUST argue the contrarian position and identify weaknesses in emerging consensus
+- Role rotates each round (Claude R1 → GPT R2 → Gemini R3...) to ensure sustained disagreement
+- Challenger is excluded from consensus detection (forced disagreement shouldn't block early exit)
 
 **Anonymous Deliberation:**
 - Models see each other as "Speaker 1", "Speaker 2", etc. during deliberation
