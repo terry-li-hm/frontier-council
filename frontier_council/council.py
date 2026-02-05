@@ -17,13 +17,13 @@ MOONSHOT_URL = "https://api.moonshot.cn/v1/chat/completions"
 # Format: (name, openrouter_model, fallback) - fallback is (provider, model) or None
 # Providers: "google" = AI Studio, "moonshot" = Moonshot API
 COUNCIL = [
-    ("Claude", "anthropic/claude-opus-4.5", None),
     ("GPT", "openai/gpt-5.2-pro", None),
     ("Gemini", "google/gemini-3-pro-preview", ("google", "gemini-2.5-pro")),
     ("Grok", "x-ai/grok-4", None),
     ("Kimi", "moonshotai/kimi-k2.5", ("moonshot", "kimi-k2.5")),
 ]
 
+# Claude is judge-only (not in council) to avoid conflict of interest
 JUDGE_MODEL = "anthropic/claude-opus-4.5"
 
 # Domain-specific regulatory contexts
@@ -977,14 +977,17 @@ Factor this into your advice — don't just give strategically optimal answers, 
 ## Social Calibration Check
 [Would the recommendation feel natural in conversation? Is it something you'd actually say, or does it sound like strategic over-optimization? If the council produced something too formal/structured, suggest a simpler, more human alternative.]"""
 
-    judge_system = f"""You are the Judge, responsible for synthesizing the council's deliberation.{context_hint}{domain_hint}
+    judge_system = f"""You are the Judge (Claude), responsible for synthesizing the council's deliberation.{context_hint}{domain_hint}
+
+You did NOT participate in the deliberation — you're seeing it fresh. This gives you objectivity.
 
 After the council members have shared their perspectives, you:
 1. Identify points of AGREEMENT across all members
 2. Identify points of DISAGREEMENT and explain the different views
-3. Provide a SYNTHESIS that captures the council's collective wisdom
-4. Give a final RECOMMENDATION based on the deliberation
-{"5. SOCIAL CALIBRATION: Check if the recommendation would feel natural in actual conversation" if social_mode else ""}
+3. Add YOUR OWN perspective — what did the council miss? What's your independent take?
+4. Provide a SYNTHESIS that integrates the council's views with your own
+5. Give a final RECOMMENDATION based on everything
+{"6. SOCIAL CALIBRATION: Check if the recommendation would feel natural in actual conversation" if social_mode else ""}
 
 Format your response as:
 
@@ -994,13 +997,16 @@ Format your response as:
 ## Points of Disagreement
 [Where views differ and why]
 
+## Judge's Own Take
+[Your independent perspective. What did the council miss or underweight? What would YOU add to this discussion?]
+
 ## Synthesis
-[The integrated perspective]
+[The integrated perspective, combining council views with your own]
 
 ## Recommendation
-[Your final recommendation based on the deliberation]
+[Your final recommendation]
 {social_judge_section}
-Be balanced and fair. Acknowledge minority views. Don't just pick a winner.{" For social contexts, prioritize natural/human output over strategic optimization." if social_mode else ""}
+Be balanced and fair. Acknowledge minority views. But don't be afraid to have your own opinion — you're the judge, not just a summarizer.{" For social contexts, prioritize natural/human output over strategic optimization." if social_mode else ""}
 
 IMPORTANT: In your Recommendation, clearly distinguish:
 - **Do Now** — practical actions the user can take immediately

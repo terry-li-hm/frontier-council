@@ -282,8 +282,8 @@ class TestConsensusWithChallenger:
     """Tests for consensus detection with challenger exclusion."""
 
     # Minimal council config for testing (only name matters)
+    # Matches real council: GPT, Gemini, Grok, Kimi (Claude is judge-only)
     COUNCIL_CONFIG = [
-        ("Claude", "model", None),
         ("GPT", "model", None),
         ("Gemini", "model", None),
         ("Grok", "model", None),
@@ -293,70 +293,65 @@ class TestConsensusWithChallenger:
     def test_consensus_excludes_challenger(self):
         """Challenger's agreement doesn't count toward consensus."""
         conversation = [
-            ("Claude", "CONSENSUS: I agree"),
-            ("GPT", "CONSENSUS: agreed"),
+            ("GPT", "CONSENSUS: I agree"),
             ("Gemini", "CONSENSUS: yes"),  # This is the challenger
             ("Grok", "CONSENSUS: agreed"),
             ("Kimi", "different view"),
         ]
-        # Gemini (index 2) is challenger, excluded
-        # 3 of 4 non-challengers have CONSENSUS = threshold met
-        converged, reason = detect_consensus(conversation, self.COUNCIL_CONFIG, 2)
+        # Gemini (index 1) is challenger, excluded
+        # 2 of 3 non-challengers have CONSENSUS = threshold met
+        converged, reason = detect_consensus(conversation, self.COUNCIL_CONFIG, 1)
         assert converged
         assert "consensus" in reason.lower()
 
     def test_no_consensus_without_challenger_exclusion(self):
-        """Without exclusion, this would be 4/5 but with exclusion it's 3/4."""
+        """Without exclusion, this would be 3/4 but with exclusion it's 2/3."""
         conversation = [
-            ("Claude", "CONSENSUS: I agree"),
-            ("GPT", "CONSENSUS: agreed"),
+            ("GPT", "CONSENSUS: I agree"),
             ("Gemini", "different view"),  # This is the challenger
             ("Grok", "CONSENSUS: agreed"),
             ("Kimi", "another view"),
         ]
-        # Gemini (index 2) is challenger, excluded
-        # Only 3 of 4 non-challengers have CONSENSUS, threshold is 3
-        converged, _ = detect_consensus(conversation, self.COUNCIL_CONFIG, 2)
+        # Gemini (index 1) is challenger, excluded
+        # 2 of 3 non-challengers have CONSENSUS, threshold is 2
+        converged, _ = detect_consensus(conversation, self.COUNCIL_CONFIG, 1)
         assert converged
 
     def test_no_consensus_when_non_challengers_disagree(self):
         """No consensus when non-challengers don't agree enough."""
         conversation = [
-            ("Claude", "CONSENSUS: I agree"),
-            ("GPT", "different view"),
+            ("GPT", "CONSENSUS: I agree"),
             ("Gemini", "CONSENSUS: yes"),  # This is the challenger, excluded
             ("Grok", "another view"),
             ("Kimi", "yet another view"),
         ]
-        # Gemini (index 2) is challenger, excluded
-        # Only 1 of 4 non-challengers have CONSENSUS, threshold is 3
-        converged, _ = detect_consensus(conversation, self.COUNCIL_CONFIG, 2)
+        # Gemini (index 1) is challenger, excluded
+        # Only 1 of 3 non-challengers have CONSENSUS, threshold is 2
+        converged, _ = detect_consensus(conversation, self.COUNCIL_CONFIG, 1)
         assert not converged
 
     def test_consensus_without_challenger_idx(self):
         """Without challenger index, all models count toward consensus."""
         conversation = [
-            ("Claude", "CONSENSUS: I agree"),
-            ("GPT", "CONSENSUS: agreed"),
+            ("GPT", "CONSENSUS: I agree"),
             ("Gemini", "CONSENSUS: yes"),
             ("Grok", "CONSENSUS: agreed"),
             ("Kimi", "different view"),
         ]
-        # No challenger exclusion - 4/5 have CONSENSUS
+        # No challenger exclusion - 3/4 have CONSENSUS
         converged, _ = detect_consensus(conversation, self.COUNCIL_CONFIG, None)
         assert converged
 
     def test_agreement_phrases_with_challenger(self):
         """Agreement phrases also exclude challenger."""
         conversation = [
-            ("Claude", "I agree with the others"),
-            ("GPT", "I concur with this"),
+            ("GPT", "I agree with the others"),
             ("Gemini", "I agree with everyone"),  # challenger
-            ("Grok", "We all agree on this"),
+            ("Grok", "I concur with this"),
             ("Kimi", "something else"),
         ]
-        # Gemini (index 2) is challenger, excluded
-        # 3 of 4 non-challengers have agreement phrases, threshold is 3
+        # Gemini (index 1) is challenger, excluded
+        # 2 of 3 non-challengers have agreement phrases, threshold is 2
         converged, reason = detect_consensus(conversation, self.COUNCIL_CONFIG, 2)
         assert converged
         assert "agreement" in reason.lower()

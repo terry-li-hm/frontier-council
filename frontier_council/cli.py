@@ -171,9 +171,9 @@ Examples:
             sys.exit(1)
         challenger_idx = model_name_map[challenger_lower]
     elif args.domain:
-        # Default challenger: Claude (index 0) when domain is set
-        # Reasoning: Grok is naturally contrarian anyway, so assigning Claude as challenger
-        # gives you Claude's depth + explicit contrarian framing, plus Grok's natural skepticism
+        # Default challenger: GPT (index 0) when domain is set
+        # Reasoning: Grok is naturally contrarian anyway, so assigning GPT as challenger
+        # gives you two sources of pushback
         challenger_idx = 0
 
     if not args.quiet and challenger_idx is not None:
