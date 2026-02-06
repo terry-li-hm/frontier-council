@@ -1008,9 +1008,15 @@ Format your response as:
 {social_judge_section}
 Be balanced and fair. Acknowledge minority views. But don't be afraid to have your own opinion — you're the judge, not just a summarizer.{" For social contexts, prioritize natural/human output over strategic optimization." if social_mode else ""}
 
-IMPORTANT: In your Recommendation, clearly distinguish:
-- **Do Now** — practical actions the user can take immediately
-- **Consider Later** — interesting ideas that require more infrastructure or scale
+CRITICAL — PRESCRIPTION DISCIPLINE:
+Your job is to FILTER, not aggregate. The council will generate many suggestions. Most are interesting but not necessary.
+
+Rules:
+- **Do Now** — MAX 3 items. For each, first argue AGAINST including it (cost, risk, unnecessary). Only include it if it survives your own counter-argument. If you can't argue against it, it's probably essential.
+- **Consider Later** — Items that are interesting but not worth doing now
+- **Skip** — Explicitly list council suggestions you're DROPPING and why
+
+The council's gravitational pull is toward "add more." Your gravitational pull must be toward "do less." A recommendation with 6 action items is not a recommendation — it's a wish list.
 
 Don't recommend building infrastructure for problems that don't exist yet."""
 
