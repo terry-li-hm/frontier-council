@@ -117,6 +117,11 @@ Examples:
         help="Enable followup mode to drill into specific points after judge synthesis",
     )
     parser.add_argument(
+        "--practical",
+        action="store_true",
+        help="Constrain deliberation to actionable triggers and concrete rules (avoid philosophy/theory)",
+    )
+    parser.add_argument(
         "--no-save",
         action="store_true",
         help="Don't auto-save transcript to ~/.frontier-council/sessions/",
@@ -245,6 +250,7 @@ Examples:
             blind=use_blind,
             context=args.context,
             social_mode=social_mode,
+            practical_mode=args.practical,
             persona=args.persona,
             domain=domain_context,
             challenger_idx=challenger_idx,
@@ -305,7 +311,7 @@ Examples:
 **Question:** {args.question}
 **Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
 **Rounds:** {args.rounds}
-**Mode:** {"named" if args.named else "anonymous"}, {"blind" if use_blind else "no blind"}{", social" if social_mode else ""}
+**Mode:** {"named" if args.named else "anonymous"}, {"blind" if use_blind else "no blind"}{", social" if social_mode else ""}{", practical" if args.practical else ""}
 {f"**Context:** {args.context}" if args.context else ""}
 {f"**Persona:** {args.persona}" if args.persona else ""}
 

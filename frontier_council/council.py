@@ -468,7 +468,11 @@ Provide a CLAIM SKETCH (not a full response):
 2. Top 3 supporting claims or considerations
 3. Key assumption or uncertainty
 
-Keep it concise (~100 words). The full deliberation comes later."""
+Keep it concise (~100 words). The full deliberation comes later.
+Prioritize PRACTICAL, ACTIONABLE advice over academic observations."""
+
+    if practical_mode:
+        blind_system += practical_constraint
 
     if domain_context:
         blind_system += f"""
@@ -585,6 +589,31 @@ def detect_consensus(
     return False, "no consensus"
 
 
+EXTRACTION_MODEL = "anthropic/claude-haiku-4-5"
+
+EXTRACTION_PROMPT = """Extract a structured JSON summary from this judge synthesis.
+
+Return ONLY valid JSON (no markdown fences, no commentary) matching this schema:
+
+{
+  "decision": "The core recommendation in 1-2 sentences",
+  "confidence": "high|medium|low",
+  "reasoning_summary": "2-3 sentence summary of why",
+  "dissents": [{"model": "model name", "concern": "what they disagreed on"}],
+  "action_items": [{"action": "specific action", "priority": "high|medium|low"}],
+  "do_now": ["action 1", "action 2", "action 3"],
+  "consider_later": ["item 1", "item 2"],
+  "skip": ["dropped item with reason"]
+}
+
+Rules:
+- decision: the judge's final recommendation, not a section heading
+- do_now: max 3 items from the judge's "Do Now" section
+- action_items: all concrete actions mentioned, with priority
+- dissents: real disagreements with the model name that raised them
+- If a field has no content, use an empty list []"""
+
+
 def extract_structured_summary(
     judge_response: str,
     question: str,
@@ -592,46 +621,62 @@ def extract_structured_summary(
     rounds: int,
     duration: float,
     cost: float,
+    api_key: str | None = None,
 ) -> dict:
-    lines = judge_response.split('\n')
-    
-    decision = ""
-    confidence = "medium"
-    reasoning = ""
-    dissents = []
-    action_items = []
-    
-    for i, line in enumerate(lines):
-        line_lower = line.lower()
-        if 'recommend' in line_lower or 'decision:' in line_lower:
-            decision = line.strip()
-        elif 'dissent' in line_lower or 'disagree' in line_lower:
-            dissents.append({"model": "Unknown", "concern": line.strip()})
-        elif 'action' in line_lower or 'next step' in line_lower:
-            action_items.append({"action": line.strip(), "priority": "medium"})
-    
-    if not decision:
+    extracted = {}
+
+    # Try LLM extraction if API key available
+    if api_key:
+        try:
+            messages = [
+                {"role": "system", "content": EXTRACTION_PROMPT},
+                {"role": "user", "content": judge_response},
+            ]
+            raw = query_model(api_key, EXTRACTION_MODEL, messages, max_tokens=800, timeout=30.0)
+            # Strip markdown fences if present
+            raw = raw.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+            extracted = json.loads(raw)
+        except (json.JSONDecodeError, Exception):
+            pass  # Fall through to fallback
+
+    # Fallback: minimal extraction from text
+    if not extracted:
+        lines = judge_response.split('\n')
+        decision = ""
         for line in lines:
-            if len(line.strip()) > 20:
+            line_lower = line.lower()
+            if 'recommend' in line_lower or 'decision:' in line_lower:
                 decision = line.strip()
                 break
-    
-    return {
-        "schema_version": "1.0",
-        "question": question,
-        "decision": decision[:500] if decision else "See transcript for details",
-        "confidence": confidence,
-        "reasoning_summary": judge_response[:1000],
-        "dissents": dissents[:5],
-        "action_items": action_items[:5],
-        "meta": {
-            "timestamp": datetime.now().isoformat(),
-            "models_used": models_used,
-            "rounds": rounds,
-            "duration_seconds": duration,
-            "estimated_cost_usd": cost
+        if not decision:
+            for line in lines:
+                if len(line.strip()) > 20:
+                    decision = line.strip()
+                    break
+        extracted = {
+            "decision": decision[:500] if decision else "See transcript for details",
+            "confidence": "medium",
+            "reasoning_summary": judge_response[:1000],
+            "dissents": [],
+            "action_items": [],
         }
+
+    # Always add meta and question
+    extracted["schema_version"] = "1.0"
+    extracted["question"] = question
+    extracted["meta"] = {
+        "timestamp": datetime.now().isoformat(),
+        "models_used": models_used,
+        "rounds": rounds,
+        "duration_seconds": duration,
+        "estimated_cost_usd": cost,
     }
+    return extracted
 
 
 def run_followup_discussion(
@@ -736,6 +781,7 @@ def run_council(
     blind: bool = True,
     context: str | None = None,
     social_mode: bool = False,
+    practical_mode: bool = False,
     persona: str | None = None,
     domain: str | None = None,
     challenger_idx: int | None = None,  # Starting challenger index, rotates each round
@@ -800,6 +846,14 @@ Your output should feel natural in conversation - something you'd actually say o
 Avoid structured, multi-part diagnostic questions that sound like interrogation.
 Simple and human beats strategic and comprehensive. Optimize for being relatable, not thorough."""
 
+    practical_constraint = """
+
+PRACTICAL MODE: Focus on actionable triggers and concrete decision rules.
+- Every claim must end with a specific action or rule ("do X when Y")
+- Avoid cognitive science, philosophy, abstract theory, or speculation about human cognition
+- No "it depends" hedging — commit to a threshold or trigger
+- If you can't make it actionable, skip it"""
+
     first_speaker_with_blind = """You are {name}, speaking first in Round {round_num} of a council deliberation.
 
 You've seen everyone's BLIND CLAIMS (their independent initial positions). Now engage:
@@ -807,11 +861,13 @@ You've seen everyone's BLIND CLAIMS (their independent initial positions). Now e
 2. Agree, disagree, or build on their position
 3. Develop your own position further based on what you've learned
 
-Be direct. Challenge weak arguments. Don't be sycophantic."""
+Be direct. Challenge weak arguments. Don't be sycophantic.
+Prioritize PRACTICAL, ACTIONABLE advice over academic observations. Avoid jargon."""
 
     first_speaker_system = """You are {name}, speaking first in Round {round_num} of a council deliberation.
 
 As the first speaker, stake a clear position on the question. Be specific and substantive so others can engage with your points.
+Prioritize PRACTICAL, ACTIONABLE advice over academic observations. Avoid jargon.
 
 End with 2-3 key claims that others should respond to."""
 
@@ -875,6 +931,9 @@ Apply this regulatory domain context to your analysis."""
 
             if social_mode:
                 system_prompt += social_constraint
+
+            if practical_mode:
+                system_prompt += practical_constraint
 
             if persona:
                 system_prompt += f"""
@@ -1020,6 +1079,11 @@ The council's gravitational pull is toward "add more." Your gravitational pull m
 
 Don't recommend building infrastructure for problems that don't exist yet."""
 
+    if practical_mode:
+        judge_system += """
+
+PRACTICAL MODE: The council was asked for actionable triggers and concrete rules. Filter aggressively — drop any recommendation that is philosophical, abstract, or not immediately actionable. Every Do Now item must be a specific rule or trigger, not a habit or mindset shift."""
+
     deliberation_text = "\n\n".join(
         f"**{display_names[speaker]}**: {sanitize_speaker_content(text)}" for speaker, text in conversation
     )
@@ -1049,6 +1113,7 @@ Don't recommend building infrastructure for problems that don't exist yet."""
             rounds=current_round if rounds > 0 else 1,
             duration=time.time() - start_time,
             cost=0.85,
+            api_key=api_key,
         )
         
         if format == 'json':
